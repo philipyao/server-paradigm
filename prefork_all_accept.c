@@ -68,7 +68,8 @@ void do_job(int listen_fd) {
     //file 结构维护一个引用计数，N个进程拥有 listen_fd 则引用计数是 N
     //所有进程都阻塞在 listen_fd 的 accept 系统调用上时，实际是在 socket结构的 so_timeo 成员上进入睡眠；当有新
     //连接过来时，所有进程都被唤醒，但只有最先运行的进程获得连接(从已完成三次握手的队列里取，队列大小取决于 backlog 大小)
-    //这个问题称为惊群(thundering herd)，有一个连接过来时，所有进程都被唤醒，会导致性能受损（进程越多越明显）
+    //这个问题称为惊群(thundering herd)，有一个连接过来时，所有进程(或线程)都被唤醒，会导致性能受损（进程越多越明显）
+    //注意 多进程或线程同时 accept 有些内核不支持
     for ( ; ; ) {
         int connfd = accept(listen_fd, (struct sockaddr *)&cli_addr, &clilen);
         if (connfd < 0) {
