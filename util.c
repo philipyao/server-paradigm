@@ -9,6 +9,8 @@
 #include <arpa/inet.h>
 #include <sys/resource.h>
 #include <sys/time.h>
+// for iov
+#include <sys/uio.h>
 
 #define SIZE_BACKLOG    10
 
@@ -61,4 +63,64 @@ void output_statistic() {
             master_usage.ru_stime.tv_sec, master_usage.ru_stime.tv_usec,
             children_usage.ru_utime.tv_sec, children_usage.ru_utime.tv_usec, 
             children_usage.ru_stime.tv_sec, children_usage.ru_stime.tv_usec);
+}
+
+//通过 fd 发送 sendfd 描述符
+ssize_t write_fd(int fd, int sendfd)
+{
+    struct msghdr   msg;
+    struct iovec    iov[1];
+
+    int cmsgsize = CMSG_LEN(sizeof(int));
+    static struct cmsghdr* cmptr = NULL;
+    if (cmptr == NULL) {
+        cmptr = (struct cmsghdr*)malloc(cmsgsize);
+        cmptr->cmsg_level = SOL_SOCKET;
+        cmptr->cmsg_type = SCM_RIGHTS; // we are sending fd.
+        cmptr->cmsg_len = cmsgsize;
+    }
+
+    char c = 0;
+    iov[0].iov_base = &c;
+    iov[0].iov_len = 1;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_control = cmptr;
+    msg.msg_controllen = cmsgsize;
+    *(int *)CMSG_DATA(cmptr) = sendfd;
+
+    return(sendmsg(fd, &msg, 0));
+}
+
+int recv_fd(int sock)
+{
+    int cmsgsize = CMSG_LEN(sizeof(int));
+    static struct cmsghdr* cmptr = NULL;
+    if (cmptr == NULL) {
+        cmptr = (struct cmsghdr *)malloc(cmsgsize);
+    }
+    
+    char c; // the max buf in msg.
+    struct iovec iov[1];
+    iov[0].iov_base = &c;
+    iov[0].iov_len = 1;
+    
+    struct msghdr msg;
+    msg.msg_iov = iov;
+    msg.msg_iovlen  = 1;
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_control = cmptr;
+    msg.msg_controllen = cmsgsize;
+    
+    int ret = recvmsg(sock, &msg, 0);
+    if (ret == -1) {
+        perror("[recv_fd] recvmsg error");
+        exit(1);
+    }
+    
+    int fd = *(int *)CMSG_DATA(cmptr);
+    return fd;
 }
