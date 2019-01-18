@@ -11,7 +11,6 @@
 #include <assert.h>
 #include "util.h"
 
-
 static const int kListenPort = 9527;
 
 struct Child {
@@ -22,9 +21,11 @@ struct Child {
 typedef struct Child Child;
 
 static Child *children = NULL;
-static const int nchild = 1;
+static const int nchild = 5;
 
+//派发客户端连接
 void diapatch_conn(int connfd) {
+    //找出一个空闲的子进程
     int i;
     for (i = 0; i < nchild; ++i) {
         if (children[i].status == 0) { break; }
@@ -36,6 +37,13 @@ void diapatch_conn(int connfd) {
     printf("diapatch connection %d to child %d pid %d\n", connfd, i, children[i].pid);
     children[i].status = 1;
 
+    //使用unix域套接字传递套接字（客户端连接connfd）
+    //注意不能直接直接往pipe_fd里写connfd，因为每个进程的fd只是文件描述表的索引
+    //两个进程的文件描述表一般都不同（父子进程fork的之后相同，但如果父子进程又打开了描述符，则不同)
+    //fd作为描述表的索引，在进程内才有意义，直接在进程间传递没有意义
+    //关于进程间传递描述符，实际是重新创建了文件描述项，具体可以查看APUE或者UNP的相关章节
+    //另外，除了父进程往子进程传递描述符让子进程来read，也有的服务器模型是在master父进程中read，然后
+    //将read到的数据dispatch到子进程进行处理，这样实际的IO完全都在master做，子进程只是处理逻辑
     ssize_t retval = write_fd(children[i].pipe_fd, connfd);
     printf("write to child %d, pipe_fd %d, val %d, retval %zd\n", i, children[i].pipe_fd, connfd, retval);
 }
@@ -119,7 +127,7 @@ int main() {
     //子进程fork之后再设置信号处理函数
     void handle_int(int);
     signal(SIGINT, handle_int);
-    
+
     fd_set readfds;
     int maxfd;
     for ( ; ; ) {
