@@ -66,7 +66,7 @@ void build_fd_set(int listen_fd, fd_set *readfds, int *maxfd) {
     FD_SET(listen_fd, readfds);
     *maxfd = listen_fd;
     for (int i = 0; i < nchild; ++i) {
-        if (children[i].status > 0) {
+        if (children[i].status == 0) {
             continue;
         }
         FD_SET(children[i].pipe_fd, readfds);
@@ -116,6 +116,10 @@ int main() {
         make_child_worker(i, listen_fd);
     }
 
+    //子进程fork之后再设置信号处理函数
+    void handle_int(int);
+    signal(SIGINT, handle_int);
+    
     fd_set readfds;
     int maxfd;
     for ( ; ; ) {
@@ -126,7 +130,7 @@ int main() {
             continue;
         }
         int count = 0;
-        if (FD_ISSET(listen_fd, &readfds) != 0) {
+        if (FD_ISSET(listen_fd, &readfds)) {
             handle_listen(listen_fd);
             ++count;
             if (count >= ready) {
@@ -134,7 +138,7 @@ int main() {
             }
         }
         for (int j = 0; j < nchild; ++j) {
-            if (FD_ISSET(children[j].pipe_fd, &readfds) != 0) {
+            if (FD_ISSET(children[j].pipe_fd, &readfds)) {
                 handle_child_msg(j);
                 ++count;
                 if (count >= ready) {
@@ -142,14 +146,6 @@ int main() {
                 }
             }
         }
-    }
-
-    //子进程fork之后再设置信号处理函数
-    void handle_int(int);
-    signal(SIGINT, handle_int);
-
-    for ( ; ; ) {
-        pause();
     }
 
     return 0;
