@@ -16,7 +16,9 @@ static const int kListenPort = 9527;
 struct Child {
     pid_t pid;
     int pipe_fd;
-    int status;   /* 0 = ready */
+    //这里一个子进程一个只能服务一个连接，所以要标识忙闲
+    //其实借助select/epoll多路复用技术完全可以服务多个连接
+    int status;
 };
 typedef struct Child Child;
 
@@ -51,6 +53,7 @@ void diapatch_conn(int connfd) {
 void handle_listen(int listen_fd) {
     struct sockaddr_in cli_addr;
     socklen_t clilen = sizeof(cli_addr);
+    //主进程负责accept新连接，然后交给子进程维护
     int connfd = accept(listen_fd, (struct sockaddr *)&cli_addr, &clilen);
     if (connfd < 0) {
         if (errno == EINTR) {
@@ -88,6 +91,8 @@ void make_child_worker(int idx, int listen_fd) {
     void do_job(int);
 
     int fds[2];
+    //socketpairs创建一对unix域套接字，可以互相通信，且是全双工
+    //而pipe创建的是单向的
     int ret = socketpair(AF_LOCAL, SOCK_STREAM, 0, fds);
     if (ret < 0) {
         printf("socketpair err: %d\n", errno);
