@@ -71,7 +71,7 @@ gcc fork_on_conn.c util.c
 $ ./a.out
 ```
 
-运行客户端：
+运行客户端：
 ```
 $ telnet localhost 9527
 ```
