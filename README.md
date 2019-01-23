@@ -57,6 +57,7 @@ pthread_mutexattr_setpshared(&attrmutex, PTHREAD_PROCESS_SHARED);
 * 进程池或者线程池的方案优于现场创建进程或者线程的方案；可以做的优化是动态扩容或者缩容
 * 各子进程或者线程自行调用 accept 通常比父进程或者主线程统一调用accept然后再传递的效率要高，且更简单
 * 线程的方案通常比进程快
+* 都是阻塞式编程，现在并发网络服务器往往用的已经是非阻塞reactor模式了
 
 ## 代码说明
 各代码例子在 MacOS 10.13.3 上运行通过
